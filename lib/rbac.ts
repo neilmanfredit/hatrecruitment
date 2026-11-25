@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken, type TokenPayload } from './auth'
 import type { UserRole } from '@prisma/client'
 
-export type RouteHandler = (req: NextRequest, ctx: { payload: TokenPayload }) => Promise<NextResponse>
+export type RouteContext = { payload: TokenPayload; params: Record<string, string> }
+export type RouteHandler = (req: NextRequest, ctx: RouteContext) => Promise<NextResponse>
 
-export function withAuth(handler: RouteHandler, allowedRoles?: UserRole[]): (req: NextRequest) => Promise<NextResponse> {
-  return async (req: NextRequest) => {
+export function withAuth(
+  handler: RouteHandler,
+  allowedRoles?: UserRole[],
+): (req: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) => Promise<NextResponse> {
+  return async (req: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) => {
     const token = req.cookies.get('hr-session')?.value
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -16,7 +20,8 @@ export function withAuth(handler: RouteHandler, allowedRoles?: UserRole[]): (req
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return handler(req, { payload })
+    const params = ctx?.params ? await ctx.params : {}
+    return handler(req, { payload, params })
   }
 }
 

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HatLogo } from '@/components/hat-logo'
+import { SessionRefresher } from '@/components/session-refresher'
 import {
   LayoutDashboard, Briefcase, Users, GitBranch,
   Building2, Mic, UserCheck, FileText, Settings,
@@ -78,6 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#080f22' }}>
+      <SessionRefresher />
       {/* Sidebar */}
       <aside
         style={{

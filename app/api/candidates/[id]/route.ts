@@ -8,8 +8,8 @@ export const GET = withAuth(async (_req, { payload: _ }) => {
   return NextResponse.json({})
 }, RECRUITER_ROLES)
 
-export const DELETE = withAuth(async (req: NextRequest) => {
-  const id = req.nextUrl.pathname.split('/').at(-1)
+export const DELETE = withAuth(async (_req, { params }) => {
+  const id = params.id
   if (!id) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
   const candidate = await db.candidate.findUnique({ where: { id } })
