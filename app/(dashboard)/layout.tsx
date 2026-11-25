@@ -41,7 +41,9 @@ const NAV = [
   },
 ]
 
-function NavItem({ href, icon: Icon, label, active }: { href: string; icon: React.ComponentType<{ size?: number; className?: string }>; label: string; active: boolean }) {
+type IconType = React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>
+
+function NavItem({ href, icon: Icon, label, active }: { href: string; icon: IconType; label: string; active: boolean }) {
   return (
     <Link
       href={href}

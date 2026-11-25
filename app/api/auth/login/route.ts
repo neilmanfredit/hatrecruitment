@@ -25,7 +25,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-secret-change-me')
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) return NextResponse.json({ error: 'Auth not configured' }, { status: 500 })
+    const secret = new TextEncoder().encode(jwtSecret)
     const token = await new SignJWT({ email, role: 'admin' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()

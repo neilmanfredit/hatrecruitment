@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { HatLogo } from '@/components/hat-logo'
 import { BookOpen, Zap, Users, Briefcase, FileText, CreditCard, Settings, ChevronRight } from 'lucide-react'
 
-const NAV_SECTIONS = [
+type LucideIcon = React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>
+
+const NAV_SECTIONS: { label: string; icon: LucideIcon; items: { href: string; label: string }[] }[] = [
   {
     label: 'Getting Started',
     icon: Zap,

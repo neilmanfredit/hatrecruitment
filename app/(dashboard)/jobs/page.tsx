@@ -158,7 +158,7 @@ export default function JobsPage() {
                   <td>{job.due}</td>
                   <td>
                     <span className={`pill ${job.stage === 'done' ? 'pill-ok' : job.stage === 'in-progress' ? 'pill-cyan' : 'pill-dim'}`}>
-                      {STAGE_CONFIG[job.stage].label}
+                      {STAGE_CONFIG[job.stage as keyof typeof STAGE_CONFIG].label}
                     </span>
                   </td>
                   <td><button className="btn-ghost" style={{ padding: '2px 8px', fontSize: 12 }}>View</button></td>

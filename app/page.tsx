@@ -22,12 +22,14 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   )
 }
 
+type LucideIcon = React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>
+
 function IconCircle({
   icon: Icon,
   color = 'gold',
   size = 'md',
 }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>
+  icon: LucideIcon
   color?: 'gold' | 'cyan' | 'blue'
   size?: 'sm' | 'md' | 'lg'
 }) {

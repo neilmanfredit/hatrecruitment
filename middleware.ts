@@ -17,7 +17,9 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-secret')
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) throw new Error('JWT_SECRET not set')
+    const secret = new TextEncoder().encode(jwtSecret)
     await jwtVerify(token, secret)
     return NextResponse.next()
   } catch {

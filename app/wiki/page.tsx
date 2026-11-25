@@ -54,7 +54,9 @@ const SECTIONS = [
   },
 ]
 
-function ColorCircle({ icon: Icon, color }: { icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; color: string }) {
+type LucideIcon = React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
+
+function ColorCircle({ icon: Icon, color }: { icon: LucideIcon; color: string }) {
   const bg = color === 'gold' ? 'rgba(200,168,44,0.12)' : 'rgba(34,211,238,0.12)'
   const fg = color === 'gold' ? '#c8a82c' : '#22d3ee'
   return (

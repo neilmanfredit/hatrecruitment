@@ -4,9 +4,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   basePath: process.env.BASE_PATH ?? '',
   assetPrefix: process.env.BASE_PATH ?? '',
-  experimental: {
-    serverComponentsExternalPackages: ['bcryptjs'],
-  },
+  serverExternalPackages: ['bcryptjs'],
 }
 
 export default nextConfig

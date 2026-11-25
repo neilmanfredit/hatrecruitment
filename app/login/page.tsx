@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { HatLogo } from '@/components/hat-logo'
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
   const from = params.get('from') ?? '/dashboard'
@@ -151,5 +151,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#080f22' }} />}>
+      <LoginForm />
+    </Suspense>
   )
 }
