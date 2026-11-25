@@ -8,16 +8,19 @@ RUN npm install --legacy-peer-deps
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-# Generate Prisma client only — no Next.js build needed for worker
+# Copy prisma schema explicitly so changes to it bust the generate cache
+COPY prisma ./prisma
 RUN npx prisma generate
+# Copy worker and lib source after generate
+COPY worker ./worker
+COPY lib ./lib
 
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs && \
+RUN apk add --no-cache openssl && \
+    addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 worker
 
 COPY --from=builder /app/node_modules ./node_modules
@@ -27,4 +30,4 @@ COPY --from=builder /app/prisma ./prisma
 
 USER worker
 
-CMD ["node", "--loader", "ts-node/esm", "worker/index.ts"]
+CMD ["node_modules/.bin/tsx", "worker/index.ts"]

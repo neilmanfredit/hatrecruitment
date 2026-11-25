@@ -64,7 +64,7 @@ function DemoBanner() {
       padding: '7px 24px', textAlign: 'center', fontSize: 13, color: '#c8a82c',
     }}>
       <strong>Demo environment</strong> — sample data only.&nbsp;
-      <a href="https://app.hatrecruit.aceg3905.com" style={{ color: '#c8a82c', textDecoration: 'underline' }}>
+      <a href="https://app-hatrecruit.aceg3905.com" style={{ color: '#c8a82c', textDecoration: 'underline' }}>
         Switch to the live platform →
       </a>
     </div>

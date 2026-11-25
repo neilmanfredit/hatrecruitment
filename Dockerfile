@@ -10,6 +10,10 @@ RUN npm install --legacy-peer-deps
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# Copy prisma schema first so changes bust the generate cache
+COPY prisma ./prisma
+RUN npx prisma generate
+# Copy full source for Next.js build
 COPY . .
 ARG BASE_PATH=""
 ENV BASE_PATH=${BASE_PATH}
@@ -22,7 +26,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs && \
+RUN apk add --no-cache openssl && \
+    addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public

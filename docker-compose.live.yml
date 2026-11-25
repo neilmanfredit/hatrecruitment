@@ -34,43 +34,45 @@ services:
       timeout: 5s
       retries: 5
 
-  hat-recruit-minio:
-    image: minio/minio:latest
-    container_name: hat-recruit-minio
+  hat-recruit-storage:
+    image: localstack/localstack:3.8
+    container_name: hat-recruit-storage
     restart: unless-stopped
     mem_limit: 512m
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      SERVICES: s3
+      PERSISTENCE: 1
+      # LocalStack S3 accepts any credential values
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
     volumes:
-      - hat_recruit_minio:/data
+      - hat_recruit_storage:/var/lib/localstack
     networks:
       - hat_net
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
-  hat-recruit-minio-init:
-    image: minio/mc:latest
-    container_name: hat-recruit-minio-init
+  hat-recruit-storage-init:
+    image: amazon/aws-cli:latest
+    container_name: hat-recruit-storage-init
     depends_on:
-      hat-recruit-minio:
+      hat-recruit-storage:
         condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
     entrypoint: |
       /bin/sh -c "
-        mc alias set myminio http://hat-recruit-minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
-        mc mb --ignore-existing myminio/hat-recruit-cvs
-        mc mb --ignore-existing myminio/hat-recruit-contracts
-        mc mb --ignore-existing myminio/hat-recruit-timesheets
-        mc mb --ignore-existing myminio/hat-recruit-invoices
-        mc anonymous set none myminio/hat-recruit-cvs
-        mc anonymous set none myminio/hat-recruit-contracts
-        mc anonymous set none myminio/hat-recruit-timesheets
-        mc anonymous set none myminio/hat-recruit-invoices
-        echo 'MinIO buckets initialised'
+        EP=http://hat-recruit-storage:4566
+        aws --endpoint-url=$$EP s3 mb s3://hat-recruit-cvs       --region us-east-1 2>/dev/null || true
+        aws --endpoint-url=$$EP s3 mb s3://hat-recruit-contracts  --region us-east-1 2>/dev/null || true
+        aws --endpoint-url=$$EP s3 mb s3://hat-recruit-timesheets --region us-east-1 2>/dev/null || true
+        aws --endpoint-url=$$EP s3 mb s3://hat-recruit-invoices   --region us-east-1 2>/dev/null || true
+        echo 'S3 buckets initialised'
       "
     networks:
       - hat_net
@@ -95,21 +97,23 @@ services:
       DATABASE_URL: postgresql://hat_recruit:${POSTGRES_PASSWORD}@hat-recruit-db:5432/hat_recruit
       REDIS_URL: redis://:${REDIS_PASSWORD}@hat-recruit-redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      MINIO_ENDPOINT: http://hat-recruit-minio:9000
+      MINIO_ENDPOINT: http://hat-recruit-storage:4566
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       OLLAMA_URL: ${OLLAMA_URL:-http://192.168.0.14:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:32b}
       OLLAMA_NUM_CTX: "8192"
+      PRISMA_QUERY_ENGINE_LIBRARY: /app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
       REED_API_KEY: ${REED_API_KEY:-}
       PROXYCURL_API_KEY: ${PROXYCURL_API_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "3011:3010"
     networks:
       - hat_net
-    # No ports exposed — nginx on nhomenix07 proxies from outside
 
   hat-recruit-worker:
     build:
@@ -127,12 +131,13 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://hat_recruit:${POSTGRES_PASSWORD}@hat-recruit-db:5432/hat_recruit
       REDIS_URL: redis://:${REDIS_PASSWORD}@hat-recruit-redis:6379
-      MINIO_ENDPOINT: http://hat-recruit-minio:9000
+      MINIO_ENDPOINT: http://hat-recruit-storage:4566
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       OLLAMA_URL: ${OLLAMA_URL:-http://192.168.0.14:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:32b}
       OLLAMA_NUM_CTX: "8192"
+      PRISMA_QUERY_ENGINE_LIBRARY: /app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
     networks:
       - hat_net
 
@@ -146,5 +151,5 @@ volumes:
     name: hat_recruit_db
   hat_recruit_redis:
     name: hat_recruit_redis
-  hat_recruit_minio:
-    name: hat_recruit_minio
+  hat_recruit_storage:
+    name: hat_recruit_storage
