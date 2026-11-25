@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const token = await new SignJWT({ email, role: 'ADMIN' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime(`${TOKEN_TTL_SECONDS}s`)
       .sign(secret)
 
     const res = NextResponse.json({ success: true, role: 'ADMIN' })
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: TOKEN_TTL_SECONDS,
       path: '/',
     })
     return res

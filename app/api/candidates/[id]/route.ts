@@ -8,18 +8,9 @@ export const GET = withAuth(async (_req, { payload: _ }) => {
   return NextResponse.json({})
 }, RECRUITER_ROLES)
 
-type Params = { params: Promise<{ id: string }> }
-
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const { id } = await params
-  const token = req.cookies.get('hr-session')?.value
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { verifyToken } = await import('@/lib/auth')
-  const payload = await verifyToken(token)
-  if (!payload || !ADMIN_ONLY.includes(payload.role)) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-  }
+export const DELETE = withAuth(async (req: NextRequest) => {
+  const id = req.nextUrl.pathname.split('/').at(-1)
+  if (!id) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
   const candidate = await db.candidate.findUnique({ where: { id } })
   if (!candidate) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -45,4 +36,4 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   })
 
   return NextResponse.json({ success: true })
-}
+}, ADMIN_ONLY)

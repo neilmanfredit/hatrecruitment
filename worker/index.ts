@@ -3,12 +3,13 @@
  * No direct user-facing routes; communicates via BullMQ queues + DB updates.
  * This process has network access ONLY to: Ollama (192.168.0.14), PostgreSQL, MinIO, Redis.
  */
-import { Worker, type Job } from 'bullmq'
+import { Worker, Queue, type Job } from 'bullmq'
 import { db } from '../lib/db'
 import { chat, scoreCV, draftJD, draftOutreach, analyseTender } from '../lib/ollama'
 import { getPresignedUrl, deleteFile, BUCKETS } from '../lib/minio'
 import { getRedisConnection } from '../lib/queue'
 const redisConnection = getRedisConnection()
+const cvScoreQ = new Queue('cv-score', { connection: redisConnection })
 import type { CvScoreJob, JdDraftJob, TenderAnalysisJob, OutreachJob, PdfExtractJob } from '../lib/queue'
 
 // ── PDF / DOCX extraction ─────────────────────────────────────────────────────
@@ -53,8 +54,6 @@ new Worker<PdfExtractJob>('pdf-extract', async (job: Job<PdfExtractJob>) => {
 
   for (const app of applications) {
     if (app.job.description) {
-      const { Queue } = await import('bullmq')
-      const cvScoreQ = new Queue('cv-score', { connection: redisConnection })
       await cvScoreQ.add('score', {
         candidateId,
         jobId: app.jobId,
@@ -78,7 +77,7 @@ new Worker<CvScoreJob>('cv-score', async (job: Job<CvScoreJob>) => {
     data: {
       candidateId,
       jobId,
-      model: process.env.OLLAMA_MODEL ?? 'qwen2.5:32b',
+      model: process.env.OLLAMA_MODEL ?? 'qwen2.5-coder:32b',
       score,
       reasoning: result.summary,
       skills: result.strengths ?? [],
