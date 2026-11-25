@@ -1,5 +1,8 @@
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://192.168.0.14:11434'
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5-coder:32b'
+// qwen2.5:32b — text-focused; better for CV/outreach prose than qwen2.5-coder:32b
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5:32b'
+// 8192 required for tender analysis (up to ~6k input tokens)
+const NUM_CTX = parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10)
 
 export interface OllamaMessage {
   role: 'system' | 'user' | 'assistant'
@@ -10,7 +13,7 @@ export async function chat(messages: OllamaMessage[], model = OLLAMA_MODEL): Pro
   const res = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, stream: false }),
+    body: JSON.stringify({ model, messages, stream: false, options: { num_ctx: NUM_CTX } }),
   })
   if (!res.ok) throw new Error(`Ollama error: ${res.status}`)
   const data = await res.json()
@@ -57,4 +60,21 @@ export async function draftOutreach(candidateName: string, jobTitle: string, com
       content: `Draft a LinkedIn outreach message to ${candidateName} about the ${jobTitle} role at ${company}.\nMatch summary: ${matchSummary}\nKeep it under 150 words, professional but warm.`,
     },
   ])
+}
+
+export async function analyseTender(rawText: string, clientName: string): Promise<{
+  score: number
+  summary: string
+  requirements: string[]
+  risks: string[]
+}> {
+  const result = await chat([
+    { role: 'system', content: 'You are a recruitment business development expert. Analyse tender documents. Always respond with valid JSON only.' },
+    {
+      role: 'user',
+      content: `Client: ${clientName}\n\nTENDER:\n${rawText}\n\nRespond with JSON: {"score":<0-100>,"summary":"<≤100 words>","requirements":["..."],"risks":["..."]}`,
+    },
+  ])
+  const json = result.replace(/```json\n?|\n?```/g, '').trim()
+  return JSON.parse(json)
 }

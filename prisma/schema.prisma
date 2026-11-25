@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  RECRUITER
+  CONSULTANT
+  CANDIDATE
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(RECRUITER)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions     Session[]
+  jobs         Job[]
+  candidates   Candidate[]    @relation("AssignedRecruiter")
+  interviews   Interview[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  jti       String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([jti])
+  @@index([userId])
+}
+
+// ── CRM ───────────────────────────────────────────────────────────────────────
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  sector      String?
+  website     String?
+  linkedinUrl String?
+  notes       String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contacts      Contact[]
+  opportunities Opportunity[]
+  jobs          Job[]
+  invoices      Invoice[]
+
+  @@index([status])
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  title     String?
+  email     String?
+  phone     String?
+  linkedin  String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  interviews   Interview[]
+
+  @@index([clientId])
+  @@index([email])
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  clientId    String
+  title       String
+  value       Decimal? @db.Decimal(12, 2)
+  currency    String   @default("GBP")
+  status      String   @default("prospect")
+  stage       String   @default("initial_contact")
+  probability Int      @default(0)
+  closeDate   DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tenders     Tender[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([stage])
+}
+
+model Tender {
+  id             String   @id @default(cuid())
+  opportunityId  String?
+  title          String
+  clientName     String
+  sourceUrl      String?
+  deadline       DateTime?
+  value          Decimal? @db.Decimal(12, 2)
+  currency       String   @default("GBP")
+  status         String   @default("open")
+  aiAnalysis     String?
+  aiScore        Int?
+  rawText        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id])
+
+  @@index([status])
+  @@index([deadline])
+}
+
+// ── ATS ───────────────────────────────────────────────────────────────────────
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  FILLED
+  CANCELLED
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  clientId     String?
+  recruiterId  String
+  title        String
+  description  String?
+  aiDraft      String?
+  location     String?
+  remote       Boolean   @default(false)
+  salaryMin    Decimal?  @db.Decimal(10, 2)
+  salaryMax    Decimal?  @db.Decimal(10, 2)
+  currency     String    @default("GBP")
+  contractType String    @default("permanent")
+  status       JobStatus @default(DRAFT)
+  externalId   String?
+  externalSrc  String?
+  postedAt     DateTime?
+  closesAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  client       Client?   @relation(fields: [clientId], references: [id])
+  recruiter    User      @relation(fields: [recruiterId], references: [id])
+  applications Application[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([recruiterId])
+}
+
+enum CandidateStatus {
+  ACTIVE
+  PLACED
+  UNAVAILABLE
+  GDPR_ERASED
+}
+
+model Candidate {
+  id              String          @id @default(cuid())
+  recruiterId     String?
+  firstName       String
+  lastName        String
+  email           String          @unique
+  phone           String?
+  linkedinUrl     String?
+  location        String?
+  currentTitle    String?
+  currentEmployer String?
+  skills          String[]
+  cvFileKey       String?
+  cvText          String?
+  cvExtractedAt   DateTime?
+  availableFrom   DateTime?
+  salaryExpected  Decimal?        @db.Decimal(10, 2)
+  currency        String          @default("GBP")
+  status          CandidateStatus @default(ACTIVE)
+  source          String?
+  consentGiven    Boolean         @default(false)
+  consentAt       DateTime?
+  retentionUntil  DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  recruiter       User?           @relation("AssignedRecruiter", fields: [recruiterId], references: [id])
+  applications    Application[]
+  aiScores        AiScore[]
+
+  @@index([email])
+  @@index([status])
+  @@index([retentionUntil])
+}
+
+enum ApplicationStage {
+  SOURCED
+  APPLIED
+  SCREENING
+  SHORTLISTED
+  CLIENT_INTERVIEW
+  OFFER
+  PLACED
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id          String           @id @default(cuid())
+  jobId       String
+  candidateId String
+  stage       ApplicationStage @default(APPLIED)
+  score       Int?
+  notes       String?
+  rejectedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate   Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  events      PipelineEvent[]
+  interviews  Interview[]
+
+  @@unique([jobId, candidateId])
+  @@index([jobId])
+  @@index([candidateId])
+  @@index([stage])
+}
+
+model PipelineEvent {
+  id            String   @id @default(cuid())
+  applicationId String
+  fromStage     String?
+  toStage       String
+  note          String?
+  actorId       String?
+  createdAt     DateTime @default(now())
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([createdAt])
+}
+
+model Interview {
+  id            String   @id @default(cuid())
+  applicationId String
+  contactId     String?
+  recruiterId   String?
+  scheduledAt   DateTime
+  durationMins  Int      @default(60)
+  format        String   @default("video")
+  location      String?
+  outcome       String?
+  feedback      String?
+  aiTranscript  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  contact       Contact?    @relation(fields: [contactId], references: [id])
+  recruiter     User?       @relation(fields: [recruiterId], references: [id])
+
+  @@index([applicationId])
+  @@index([scheduledAt])
+}
+
+model AiScore {
+  id          String   @id @default(cuid())
+  candidateId String
+  jobId       String?
+  model       String
+  score       Int
+  reasoning   String?
+  skills      String[]
+  gaps        String[]
+  inputTokens Int?
+  outputTokens Int?
+  latencyMs   Int?
+  createdAt   DateTime @default(now())
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+// ── Consultant / Billing ──────────────────────────────────────────────────────
+
+model Consultant {
+  id              String   @id @default(cuid())
+  candidateId     String?  @unique
+  firstName       String
+  lastName        String
+  email           String   @unique
+  phone           String?
+  clientId        String?
+  jobId           String?
+  startDate       DateTime?
+  endDate         DateTime?
+  dayRate         Decimal? @db.Decimal(10, 2)
+  currency        String   @default("GBP")
+  contractFileKey String?
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  timesheets      Timesheet[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model Timesheet {
+  id              String   @id @default(cuid())
+  consultantId    String
+  periodStart     DateTime
+  periodEnd       DateTime
+  hoursWorked     Decimal  @db.Decimal(6, 2)
+  dayRate         Decimal  @db.Decimal(10, 2)
+  currency        String   @default("GBP")
+  status          String   @default("submitted")
+  fileKey         String?
+  aiExtracted     Boolean  @default(false)
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  consultant      Consultant @relation(fields: [consultantId], references: [id])
+  invoiceLines    InvoiceLine[]
+
+  @@index([consultantId])
+  @@index([status])
+  @@index([periodStart])
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  clientId    String
+  invoiceNo   String   @unique
+  issuedAt    DateTime @default(now())
+  dueAt       DateTime
+  total       Decimal  @db.Decimal(12, 2)
+  currency    String   @default("GBP")
+  status      String   @default("draft")
+  pdfFileKey  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client      Client   @relation(fields: [clientId], references: [id])
+  lines       InvoiceLine[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueAt])
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  timesheetId String?
+  description String
+  quantity    Decimal  @db.Decimal(6, 2)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(12, 2)
+
+  invoice     Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  timesheet   Timesheet? @relation(fields: [timesheetId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ── Sourcing / External ───────────────────────────────────────────────────────
+
+model SourcingLead {
+  id          String   @id @default(cuid())
+  source      String
+  externalId  String?
+  type        String
+  title       String?
+  name        String?
+  email       String?
+  linkedinUrl String?
+  rawData     Json?
+  status      String   @default("new")
+  candidateId String?
+  jobId       String?
+  createdAt   DateTime @default(now())
+
+  @@index([source])
+  @@index([status])
+  @@index([createdAt])
+}

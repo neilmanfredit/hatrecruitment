@@ -57,6 +57,20 @@ function IconCircle({
 
 /* ── Nav ─────────────────────────────────────────────────────────────── */
 
+function DemoBanner() {
+  return (
+    <div style={{
+      background: 'rgba(200,168,44,0.12)', borderBottom: '1px solid rgba(200,168,44,0.25)',
+      padding: '7px 24px', textAlign: 'center', fontSize: 13, color: '#c8a82c',
+    }}>
+      <strong>Demo environment</strong> — sample data only.&nbsp;
+      <a href="https://app.hatrecruit.aceg3905.com" style={{ color: '#c8a82c', textDecoration: 'underline' }}>
+        Switch to the live platform →
+      </a>
+    </div>
+  )
+}
+
 function Nav() {
   return (
     <nav
@@ -785,8 +799,9 @@ function Footer() {
 export default function HomePage() {
   return (
     <>
+      <DemoBanner />
       <Nav />
-      <main style={{ paddingTop: 64 }}>
+      <main style={{ paddingTop: 96 }}>
         <Hero />
         <KpiBar />
         <WhySection />

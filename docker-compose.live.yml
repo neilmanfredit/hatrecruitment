@@ -1,0 +1,150 @@
+services:
+  hat-recruit-db:
+    image: postgres:16-alpine
+    container_name: hat-recruit-db
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      POSTGRES_DB: hat_recruit
+      POSTGRES_USER: hat_recruit
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - hat_recruit_db:/var/lib/postgresql/data
+    networks:
+      - hat_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hat_recruit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hat-recruit-redis:
+    image: redis:7-alpine
+    container_name: hat-recruit-redis
+    restart: unless-stopped
+    mem_limit: 256m
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - hat_recruit_redis:/data
+    networks:
+      - hat_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hat-recruit-minio:
+    image: minio/minio:latest
+    container_name: hat-recruit-minio
+    restart: unless-stopped
+    mem_limit: 512m
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - hat_recruit_minio:/data
+    networks:
+      - hat_net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  hat-recruit-minio-init:
+    image: minio/mc:latest
+    container_name: hat-recruit-minio-init
+    depends_on:
+      hat-recruit-minio:
+        condition: service_healthy
+    entrypoint: |
+      /bin/sh -c "
+        mc alias set myminio http://hat-recruit-minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
+        mc mb --ignore-existing myminio/hat-recruit-cvs
+        mc mb --ignore-existing myminio/hat-recruit-contracts
+        mc mb --ignore-existing myminio/hat-recruit-timesheets
+        mc mb --ignore-existing myminio/hat-recruit-invoices
+        mc anonymous set none myminio/hat-recruit-cvs
+        mc anonymous set none myminio/hat-recruit-contracts
+        mc anonymous set none myminio/hat-recruit-timesheets
+        mc anonymous set none myminio/hat-recruit-invoices
+        echo 'MinIO buckets initialised'
+      "
+    networks:
+      - hat_net
+    restart: on-failure
+
+  hat-recruit-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_PATH: ""
+    container_name: hat-recruit-app
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      hat-recruit-db:
+        condition: service_healthy
+      hat-recruit-redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://hat_recruit:${POSTGRES_PASSWORD}@hat-recruit-db:5432/hat_recruit
+      REDIS_URL: redis://:${REDIS_PASSWORD}@hat-recruit-redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      MINIO_ENDPOINT: http://hat-recruit-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      OLLAMA_URL: ${OLLAMA_URL:-http://192.168.0.14:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:32b}
+      OLLAMA_NUM_CTX: "8192"
+      REED_API_KEY: ${REED_API_KEY:-}
+      PROXYCURL_API_KEY: ${PROXYCURL_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    networks:
+      - hat_net
+    # No ports exposed — nginx on nhomenix07 proxies from outside
+
+  hat-recruit-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: hat-recruit-worker
+    restart: unless-stopped
+    mem_limit: 1g
+    depends_on:
+      hat-recruit-db:
+        condition: service_healthy
+      hat-recruit-redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://hat_recruit:${POSTGRES_PASSWORD}@hat-recruit-db:5432/hat_recruit
+      REDIS_URL: redis://:${REDIS_PASSWORD}@hat-recruit-redis:6379
+      MINIO_ENDPOINT: http://hat-recruit-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      OLLAMA_URL: ${OLLAMA_URL:-http://192.168.0.14:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:32b}
+      OLLAMA_NUM_CTX: "8192"
+    networks:
+      - hat_net
+
+networks:
+  hat_net:
+    driver: bridge
+    name: hat_recruit_net
+
+volumes:
+  hat_recruit_db:
+    name: hat_recruit_db
+  hat_recruit_redis:
+    name: hat_recruit_redis
+  hat_recruit_minio:
+    name: hat_recruit_minio
