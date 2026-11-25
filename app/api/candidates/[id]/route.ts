@@ -3,9 +3,21 @@ import { db } from '@/lib/db'
 import { withAuth, RECRUITER_ROLES, ADMIN_ONLY } from '@/lib/rbac'
 import { deleteFile, BUCKETS } from '@/lib/minio'
 
-export const GET = withAuth(async (_req, { payload: _ }) => {
-  // Handled by dynamic route below
-  return NextResponse.json({})
+export const GET = withAuth(async (_req, { params }) => {
+  const id = params.id
+  if (!id) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+
+  const candidate = await db.candidate.findUnique({
+    where: { id },
+    include: {
+      applications: { include: { job: { select: { id: true, title: true } } } },
+      aiScores: { orderBy: { createdAt: 'desc' }, take: 5 },
+    },
+  })
+  if (!candidate || candidate.status === 'GDPR_ERASED') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  return NextResponse.json(candidate)
 }, RECRUITER_ROLES)
 
 export const DELETE = withAuth(async (_req, { params }) => {

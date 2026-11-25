@@ -5,10 +5,9 @@ import type { UserRole } from '@prisma/client'
 export type RouteContext = { payload: TokenPayload; params: Record<string, string> }
 export type RouteHandler = (req: NextRequest, ctx: RouteContext) => Promise<NextResponse>
 
-export function withAuth(
-  handler: RouteHandler,
-  allowedRoles?: UserRole[],
-): (req: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) => Promise<NextResponse> {
+// Compatible with both static and dynamic Next.js 15 route handlers
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withAuth(handler: RouteHandler, allowedRoles?: UserRole[]): any {
   return async (req: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) => {
     const token = req.cookies.get('hr-session')?.value
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
